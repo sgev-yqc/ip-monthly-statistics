@@ -80,6 +80,35 @@ python scripts/fill_ip.py --records records.json --xlsx 目标表.xlsx --fix fix
    ```
    打包用 `python -m zipfile -c 目标.zip 内容目录`（Windows 无 zip 命令）
 
+## 飞书多维表格台账同步（持续维护入口）
+
+飞书多维表格「知识产权累计台账」与 Excel 累计表并行，适合手机端查询/多人协作/持续维护。
+
+**Base**：`<base_token>` → https://my.feishu.cn/base/<base_token>（表结构与 token 在配置区）
+
+**表结构（4 张表，字段精简版，与 Excel 分类对应）**：
+
+| 表 | 核心字段 |
+|---|---|
+| 专利受理 | 专利名称(text主)/专利类型(select:发明·实用新型·外观设计)/申请号/申请日期(datetime)/申请人/发明·设计人/专利权人/技术领域/智能电网环节/知识产权增加方式/项目类型/使用保管人/上报年份(number)/上报季度(select) |
+| 专利授权 | 同上 + 授权公告日(datetime) |
+| 海外专利PCT | 专利名称/专利类型/国际申请号/国际申请日/申请人/专利权人/技术领域/使用保管人/上报年份/上报季度 |
+| 软著 | 软件著作权名称/证书编号/登记号/登记日期/著作权人/取得方式/权利范围/技术领域/使用保管人/上报年份/上报季度 |
+
+**同步流程**（每月填表后执行；命令用法详见 lark-base 技能）：
+
+1. 从累计表 xlsx 读对应 sheet → 构造 `{"create_records":[{字段名:CellValue}, ...]}` JSON
+2. CellValue 规范：text=字符串；select=[选项名]（选项必须已存在）；datetime="YYYY-MM-DD HH:mm"；number=数字；空字段不提交
+3. 技术领域 4 列合并为 1 个 text：`一级 / 二级 / 三级 / 四级`（join " / "）
+4. 逐表批量导入（单批 ≤200 条）：
+   ```bash
+   lark-cli base +record-batch-create --base-token <bt> --table-id <tid> --json @rec.json --as user
+   ```
+5. `lark-cli base +table-list --base-token <bt> --as user` 确认各表记录数；记录查询/更新见 lark-base-record-* 参考
+6. 身份用 `--as user`（用户明确要求应用身份时才用 bot）
+
+**补充说明**：新增记录建议 Excel 累计表 → 多维表格单向同步（Excel 是源头）；字段结构变更需先改表字段再导数据。
+
 ## 二、个人填写信息（配置区——按本单位实际情况修改）
 
 ### 固定值
@@ -100,3 +129,11 @@ python scripts/fill_ip.py --records records.json --xlsx 目标表.xlsx --fix fix
 部门/单位、序号、专利名称(软著:软件著作权名称)、专利类型、申请人、申请日期(软著:登记日期)、申请号(软著:证书编号+登记号)、使用保管人、发明/设计人(软著:著作权人)、专利权人(软著:著作权人)、上报年份、上报季度、技术领域(一级~四级)、智能电网环节(软著sheet无此列)、知识产权增加方式、项目类型
 
 软著 sheet 额外可填：权力获得方式(原始取得)、权力范围(全部权利)。证书无"申请人"栏时按著作权人填。
+
+### 飞书多维表格（配置区）
+- base_token：<base_token>
+- 专利受理表：<table_id>
+- 专利授权表：<table_id>
+- 海外专利PCT表：<table_id>
+- 软著表：<table_id>
+- 同步命令一律 `--as user`
